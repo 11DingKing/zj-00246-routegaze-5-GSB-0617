@@ -125,13 +125,16 @@ export function useDerivedStats() {
       (sum, r) => sum + r.totalPassengers,
       0,
     );
+    const first15 = trendData.values.slice(0, 15).reduce((s, v) => s + v, 0);
+    const last15 = trendData.values.slice(15, 30).reduce((s, v) => s + v, 0);
+    const momGrowth = first15 > 0 ? (last15 - first15) / first15 : 0;
     return {
       totalRoutes,
       totalTrips,
       totalPassengers,
-      yoyGrowth: 0.31,
+      momGrowth,
     };
-  }, [filteredRoutes]);
+  }, [filteredRoutes, trendData.values]);
 
   return {
     filteredRoutes,
