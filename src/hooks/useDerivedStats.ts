@@ -5,12 +5,25 @@ import { getLast30Days } from "@/utils/format";
 import { buildStationMap, getActiveStationIds } from "@/utils/coord";
 import type { Route, Station, Scenic, RegionId, TrainType } from "@/types";
 
+export interface CompareRouteStats {
+  id: string;
+  name: string;
+  color: string;
+  type: Route["type"];
+  tripsLastMonth: number;
+  occupancy: number;
+  totalPassengers: number;
+  momGrowth: number;
+  dailyTrips: number[];
+}
+
 export function useDerivedStats() {
   const selectedRegion = useDataStore((s) => s.selectedRegion);
   const selectedRouteId = useDataStore((s) => s.selectedRouteId);
   const routes = useDataStore((s) => s.routes);
   const stations = useDataStore((s) => s.stations);
   const scenics = useDataStore((s) => s.scenics);
+  const compareRouteIds = useDataStore((s) => s.compareRouteIds);
 
   const stationMap = useMemo<Record<string, Station>>(() => {
     return buildStationMap(stations);
@@ -125,13 +138,50 @@ export function useDerivedStats() {
       (sum, r) => sum + r.totalPassengers,
       0,
     );
+    let firstHalf = 0;
+    let secondHalf = 0;
+    filteredRoutes.forEach((r) => {
+      for (let i = 0; i < 15; i++) firstHalf += r.dailyTrips[i] ?? 0;
+      for (let i = 15; i < 30; i++) secondHalf += r.dailyTrips[i] ?? 0;
+    });
+    const momGrowth = firstHalf > 0 ? (secondHalf - firstHalf) / firstHalf : 0;
     return {
       totalRoutes,
       totalTrips,
       totalPassengers,
-      yoyGrowth: 0.31,
+      momGrowth,
     };
   }, [filteredRoutes]);
+
+  function calcRouteMom(route: Route): number {
+    let first = 0;
+    let second = 0;
+    for (let i = 0; i < 15; i++) first += route.dailyTrips[i] ?? 0;
+    for (let i = 15; i < 30; i++) second += route.dailyTrips[i] ?? 0;
+    return first > 0 ? (second - first) / first : 0;
+  }
+
+  const compareStats = useMemo<CompareRouteStats[]>(() => {
+    return compareRouteIds
+      .map((id) => routeMap[id])
+      .filter(Boolean)
+      .map((r) => ({
+        id: r.id,
+        name: r.name,
+        color: r.color,
+        type: r.type,
+        tripsLastMonth: r.tripsLastMonth,
+        occupancy: r.occupancy,
+        totalPassengers: r.totalPassengers,
+        momGrowth: calcRouteMom(r),
+        dailyTrips: r.dailyTrips,
+      }));
+  }, [compareRouteIds, routeMap]);
+
+  const compareGlobalMaxDaily = useMemo(() => {
+    if (compareStats.length === 0) return 1;
+    return Math.max(...compareStats.flatMap((s) => s.dailyTrips), 1);
+  }, [compareStats]);
 
   return {
     filteredRoutes,
@@ -149,5 +199,7 @@ export function useDerivedStats() {
     totalKpis,
     stations,
     scenics,
+    compareStats,
+    compareGlobalMaxDaily,
   };
 }

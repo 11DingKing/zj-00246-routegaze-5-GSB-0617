@@ -9,20 +9,12 @@ import {
 } from "lucide-react";
 import { useDataStore } from "@/store/useDataStore";
 import { useDerivedStats } from "@/hooks/useDerivedStats";
+import type { CompareRouteStats } from "@/hooks/useDerivedStats";
 import { BarChart } from "@/components/charts/BarChart";
 import type { BarChartItem } from "@/components/charts/BarChart";
 import { formatNumber, formatPercent, typeName } from "@/utils/format";
 import { getTrainTypeColor } from "@/utils/color";
 import { cn } from "@/lib/utils";
-import type { Route } from "@/types";
-
-function calcMomGrowth(route: Route): number {
-  let first = 0;
-  let second = 0;
-  for (let i = 0; i < 15; i++) first += route.dailyTrips[i] ?? 0;
-  for (let i = 15; i < 30; i++) second += route.dailyTrips[i] ?? 0;
-  return first > 0 ? (second - first) / first : 0;
-}
 
 export default function ComparePanel() {
   const compareRouteIds = useDataStore((s) => s.compareRouteIds);
@@ -30,42 +22,34 @@ export default function ComparePanel() {
   const toggleCompareRoute = useDataStore((s) => s.toggleCompareRoute);
   const clearCompareRoutes = useDataStore((s) => s.clearCompareRoutes);
   const setComparePanelOpen = useDataStore((s) => s.setComparePanelOpen);
-  const { routeMap } = useDerivedStats();
+  const { compareStats, compareGlobalMaxDaily } = useDerivedStats();
 
-  const compareRoutes = compareRouteIds
-    .map((id) => routeMap[id])
-    .filter(Boolean) as Route[];
+  if (compareStats.length === 0) return null;
 
-  if (compareRoutes.length === 0) return null;
-
-  const tripsData: BarChartItem[] = compareRoutes.map((route, idx) => ({
-    label: route.name,
-    value: route.tripsLastMonth,
-    color: route.color,
+  const tripsData: BarChartItem[] = compareStats.map((s, idx) => ({
+    label: s.name,
+    value: s.tripsLastMonth,
+    color: s.color,
     rank: idx + 1,
   }));
 
-  const occupancyData: BarChartItem[] = compareRoutes.map((route, idx) => ({
-    label: route.name,
-    value: Math.round(route.occupancy * 1000) / 10,
-    color: route.color,
+  const occupancyData: BarChartItem[] = compareStats.map((s, idx) => ({
+    label: s.name,
+    value: Math.round(s.occupancy * 1000) / 10,
+    color: s.color,
     rank: idx + 1,
   }));
 
-  const momData: BarChartItem[] = compareRoutes.map((route, idx) => ({
-    label: route.name,
-    value: Math.round(calcMomGrowth(route) * 1000) / 10,
-    color: route.color,
+  const passengerData: BarChartItem[] = compareStats.map((s, idx) => ({
+    label: s.name,
+    value: s.totalPassengers,
+    color: s.color,
     rank: idx + 1,
   }));
 
-  const maxTrips = Math.max(...compareRoutes.map((r) => r.tripsLastMonth));
-  const maxOccupancy = Math.max(...compareRoutes.map((r) => r.occupancy));
-
-  const globalMaxDaily = Math.max(
-    ...compareRoutes.flatMap((r) => r.dailyTrips),
-    1,
-  );
+  const maxTrips = Math.max(...compareStats.map((s) => s.tripsLastMonth));
+  const maxOccupancy = Math.max(...compareStats.map((s) => s.occupancy));
+  const maxPassengers = Math.max(...compareStats.map((s) => s.totalPassengers));
 
   return (
     <div
@@ -86,7 +70,7 @@ export default function ComparePanel() {
             <p className="text-xs text-slate-400">
               已选择{" "}
               <span className="font-orbitron text-cyan-400">
-                {compareRoutes.length}
+                {compareStats.length}
               </span>{" "}
               条专线进行对比
             </p>
@@ -111,60 +95,55 @@ export default function ComparePanel() {
 
       <div className="max-h-96 overflow-y-auto p-5">
         <div className="mb-5 flex flex-wrap gap-2">
-          {compareRoutes.map((route, idx) => {
-            const mom = calcMomGrowth(route);
-            return (
+          {compareStats.map((s, idx) => (
+            <div
+              key={s.id}
+              className="group flex items-center gap-2 rounded-lg border px-3 py-1.5"
+              style={{
+                borderColor: `${s.color}50`,
+                backgroundColor: `${s.color}10`,
+              }}
+            >
               <div
-                key={route.id}
-                className="group flex items-center gap-2 rounded-lg border px-3 py-1.5"
+                className="flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white"
+                style={{ backgroundColor: s.color }}
+              >
+                {idx + 1}
+              </div>
+              <span className="text-sm font-medium text-white">{s.name}</span>
+              <span
+                className="rounded px-1.5 py-0.5 text-[10px] font-medium"
                 style={{
-                  borderColor: `${route.color}50`,
-                  backgroundColor: `${route.color}10`,
+                  backgroundColor: `${getTrainTypeColor(s.type)}30`,
+                  color: getTrainTypeColor(s.type),
                 }}
               >
-                <div
-                  className="flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white"
-                  style={{ backgroundColor: route.color }}
-                >
-                  {idx + 1}
-                </div>
-                <span className="text-sm font-medium text-white">
-                  {route.name}
-                </span>
-                <span
-                  className="rounded px-1.5 py-0.5 text-[10px] font-medium"
-                  style={{
-                    backgroundColor: `${getTrainTypeColor(route.type)}30`,
-                    color: getTrainTypeColor(route.type),
-                  }}
-                >
-                  {typeName(route.type)}
-                </span>
-                <span
-                  className={cn(
-                    "flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium",
-                    mom >= 0
-                      ? "bg-emerald-500/20 text-emerald-400"
-                      : "bg-rose-500/20 text-rose-400",
-                  )}
-                >
-                  {mom >= 0 ? (
-                    <TrendingUp className="h-3 w-3" />
-                  ) : (
-                    <TrendingDown className="h-3 w-3" />
-                  )}
-                  {mom >= 0 ? "+" : ""}
-                  {(mom * 100).toFixed(1)}%
-                </span>
-                <button
-                  onClick={() => toggleCompareRoute(route.id)}
-                  className="ml-1 rounded p-0.5 text-slate-400 opacity-0 transition group-hover:opacity-100 hover:bg-white/10 hover:text-white"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            );
-          })}
+                {typeName(s.type)}
+              </span>
+              <span
+                className={cn(
+                  "flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium",
+                  s.momGrowth >= 0
+                    ? "bg-emerald-500/20 text-emerald-400"
+                    : "bg-rose-500/20 text-rose-400",
+                )}
+              >
+                {s.momGrowth >= 0 ? (
+                  <TrendingUp className="h-3 w-3" />
+                ) : (
+                  <TrendingDown className="h-3 w-3" />
+                )}
+                {s.momGrowth >= 0 ? "+" : ""}
+                {(s.momGrowth * 100).toFixed(1)}%
+              </span>
+              <button
+                onClick={() => toggleCompareRoute(s.id)}
+                className="ml-1 rounded p-0.5 text-slate-400 opacity-0 transition group-hover:opacity-100 hover:bg-white/10 hover:text-white"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
         </div>
 
         <div className="grid grid-cols-3 gap-4">
@@ -182,31 +161,31 @@ export default function ComparePanel() {
               barHeight={24}
             />
             <div className="mt-3 space-y-1.5">
-              {compareRoutes.map((route) => (
+              {compareStats.map((s) => (
                 <div
-                  key={route.id}
+                  key={s.id}
                   className="flex items-center justify-between text-xs"
                 >
                   <div className="flex items-center gap-2">
                     <div
                       className="h-2 w-2 rounded-full"
-                      style={{ backgroundColor: route.color }}
+                      style={{ backgroundColor: s.color }}
                     />
-                    <span className="text-slate-400">{route.name}</span>
+                    <span className="text-slate-400">{s.name}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span
                       className={cn(
                         "font-orbitron font-bold",
-                        route.tripsLastMonth === maxTrips
+                        s.tripsLastMonth === maxTrips
                           ? "text-cyan-400"
                           : "text-white",
                       )}
                     >
-                      {formatNumber(route.tripsLastMonth)}
+                      {formatNumber(s.tripsLastMonth)}
                     </span>
                     <span className="text-slate-500">列</span>
-                    {route.tripsLastMonth === maxTrips && (
+                    {s.tripsLastMonth === maxTrips && (
                       <span className="rounded bg-cyan-500/20 px-1.5 py-0.5 text-[10px] text-cyan-400">
                         最高
                       </span>
@@ -231,30 +210,30 @@ export default function ComparePanel() {
               barHeight={24}
             />
             <div className="mt-3 space-y-1.5">
-              {compareRoutes.map((route) => (
+              {compareStats.map((s) => (
                 <div
-                  key={route.id}
+                  key={s.id}
                   className="flex items-center justify-between text-xs"
                 >
                   <div className="flex items-center gap-2">
                     <div
                       className="h-2 w-2 rounded-full"
-                      style={{ backgroundColor: route.color }}
+                      style={{ backgroundColor: s.color }}
                     />
-                    <span className="text-slate-400">{route.name}</span>
+                    <span className="text-slate-400">{s.name}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span
                       className={cn(
                         "font-orbitron font-bold",
-                        route.occupancy === maxOccupancy
+                        s.occupancy === maxOccupancy
                           ? "text-emerald-400"
                           : "text-white",
                       )}
                     >
-                      {formatPercent(route.occupancy)}
+                      {formatPercent(s.occupancy)}
                     </span>
-                    {route.occupancy === maxOccupancy && (
+                    {s.occupancy === maxOccupancy && (
                       <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] text-emerald-400">
                         最高
                       </span>
@@ -267,49 +246,50 @@ export default function ComparePanel() {
 
           <div className="rounded-lg border border-slate-700/50 bg-slate-800/30 p-4">
             <div className="mb-3 flex items-center justify-between">
-              <h4 className="text-sm font-semibold text-white">环比增幅</h4>
+              <h4 className="text-sm font-semibold text-white">累计客流</h4>
               <span className="font-orbitron text-[10px] text-slate-500">
-                MoM
+                PASSENGERS
               </span>
             </div>
-            <BarChart data={momData} showRank={false} unit="%" barHeight={24} />
+            <BarChart
+              data={passengerData}
+              showRank={false}
+              unit="人"
+              barHeight={24}
+            />
             <div className="mt-3 space-y-1.5">
-              {compareRoutes.map((route) => {
-                const mom = calcMomGrowth(route);
-                const maxMom = Math.max(
-                  ...compareRoutes.map((r) => calcMomGrowth(r)),
-                );
-                return (
-                  <div
-                    key={route.id}
-                    className="flex items-center justify-between text-xs"
-                  >
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="h-2 w-2 rounded-full"
-                        style={{ backgroundColor: route.color }}
-                      />
-                      <span className="text-slate-400">{route.name}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={cn(
-                          "font-orbitron font-bold",
-                          mom === maxMom ? "text-amber-400" : "text-white",
-                        )}
-                      >
-                        {mom >= 0 ? "+" : ""}
-                        {(mom * 100).toFixed(1)}%
-                      </span>
-                      {mom === maxMom && (
-                        <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] text-amber-400">
-                          最优
-                        </span>
-                      )}
-                    </div>
+              {compareStats.map((s) => (
+                <div
+                  key={s.id}
+                  className="flex items-center justify-between text-xs"
+                >
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="h-2 w-2 rounded-full"
+                      style={{ backgroundColor: s.color }}
+                    />
+                    <span className="text-slate-400">{s.name}</span>
                   </div>
-                );
-              })}
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={cn(
+                        "font-orbitron font-bold",
+                        s.totalPassengers === maxPassengers
+                          ? "text-amber-400"
+                          : "text-white",
+                      )}
+                    >
+                      {formatNumber(s.totalPassengers)}
+                    </span>
+                    <span className="text-slate-500">人</span>
+                    {s.totalPassengers === maxPassengers && (
+                      <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] text-amber-400">
+                        最高
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -330,32 +310,24 @@ export default function ComparePanel() {
               preserveAspectRatio="none"
             >
               <defs>
-                {compareRoutes.map((route) => (
+                {compareStats.map((s) => (
                   <linearGradient
-                    key={route.id}
-                    id={`trend-gradient-${route.id}`}
+                    key={s.id}
+                    id={`trend-gradient-${s.id}`}
                     x1="0%"
                     y1="0%"
                     x2="0%"
                     y2="100%"
                   >
-                    <stop
-                      offset="0%"
-                      stopColor={route.color}
-                      stopOpacity="0.3"
-                    />
-                    <stop
-                      offset="100%"
-                      stopColor={route.color}
-                      stopOpacity="0"
-                    />
+                    <stop offset="0%" stopColor={s.color} stopOpacity="0.3" />
+                    <stop offset="100%" stopColor={s.color} stopOpacity="0" />
                   </linearGradient>
                 ))}
               </defs>
 
               {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
                 const y = 10 + ratio * 160;
-                const val = Math.round(globalMaxDaily * (1 - ratio));
+                const val = Math.round(compareGlobalMaxDaily * (1 - ratio));
                 return (
                   <g key={ratio}>
                     <line
@@ -408,26 +380,26 @@ export default function ComparePanel() {
                 后15天
               </text>
 
-              {compareRoutes.map((route) => {
-                const points = route.dailyTrips.map((val, i) => {
+              {compareStats.map((s) => {
+                const points = s.dailyTrips.map((val, i) => {
                   const x = 50 + (i / 29) * 570;
-                  const y = 170 - (val / globalMaxDaily) * 160;
+                  const y = 170 - (val / compareGlobalMaxDaily) * 160;
                   return [x, y] as const;
                 });
                 const areaPath = `M${points.map(([x, y]) => `${x},${y}`).join(" L")} L620,170 L50,170 Z`;
                 const linePath = `M${points.map(([x, y]) => `${x},${y}`).join(" L")}`;
 
                 return (
-                  <g key={route.id}>
+                  <g key={s.id}>
                     <path
                       d={areaPath}
-                      fill={`url(#trend-gradient-${route.id})`}
+                      fill={`url(#trend-gradient-${s.id})`}
                       style={{ transition: "all 0.5s ease" }}
                     />
                     <path
                       d={linePath}
                       fill="none"
-                      stroke={route.color}
+                      stroke={s.color}
                       strokeWidth="2"
                       style={{ transition: "all 0.5s ease" }}
                     />
@@ -435,14 +407,14 @@ export default function ComparePanel() {
                 );
               })}
 
-              {compareRoutes.map((route, idx) => (
-                <g key={`legend-${route.id}`}>
+              {compareStats.map((s, idx) => (
+                <g key={`legend-${s.id}`}>
                   <rect
                     x={50 + idx * 120}
                     y={2}
                     width="8"
                     height="8"
-                    fill={route.color}
+                    fill={s.color}
                     rx="2"
                   />
                   <text
@@ -452,7 +424,7 @@ export default function ComparePanel() {
                     fill="#94a3b8"
                     dominantBaseline="middle"
                   >
-                    {route.name}
+                    {s.name}
                   </text>
                 </g>
               ))}
@@ -486,7 +458,7 @@ export default function ComparePanel() {
           className="absolute -top-10 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-lg bg-cyan-500 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-cyan-500/30 transition hover:bg-cyan-400"
         >
           <GitCompare className="h-4 w-4" />
-          展开对比面板 ({compareRoutes.length})
+          展开对比面板 ({compareStats.length})
         </button>
       )}
     </div>
