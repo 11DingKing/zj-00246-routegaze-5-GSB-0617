@@ -51,3 +51,15 @@ export interface StationPopupData {
   x: number;
   y: number;
 }
+
+export interface CompareRouteStats {
+  id: string;
+  name: string;
+  color: string;
+  type: TrainType;
+  tripsLastMonth: number;
+  occupancy: number;
+  totalPassengers: number;
+  momGrowth: number;
+  dailyTrips: number[];
+}
