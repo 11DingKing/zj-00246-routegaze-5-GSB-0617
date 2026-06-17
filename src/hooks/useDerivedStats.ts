@@ -5,9 +5,16 @@ import { getLast30Days } from "@/utils/format";
 import { buildStationMap, getActiveStationIds } from "@/utils/coord";
 import type { Route, Station, Scenic, RegionId, TrainType } from "@/types";
 
+function calcMomGrowth(dailyTrips: number[]): number {
+  const first15 = dailyTrips.slice(0, 15).reduce((s, v) => s + v, 0);
+  const last15 = dailyTrips.slice(15, 30).reduce((s, v) => s + v, 0);
+  return first15 > 0 ? (last15 - first15) / first15 : 0;
+}
+
 export function useDerivedStats() {
   const selectedRegion = useDataStore((s) => s.selectedRegion);
   const selectedRouteId = useDataStore((s) => s.selectedRouteId);
+  const compareRouteIds = useDataStore((s) => s.compareRouteIds);
   const routes = useDataStore((s) => s.routes);
   const stations = useDataStore((s) => s.stations);
   const scenics = useDataStore((s) => s.scenics);
@@ -125,13 +132,93 @@ export function useDerivedStats() {
       (sum, r) => sum + r.totalPassengers,
       0,
     );
+    const first15 = trendData.values.slice(0, 15).reduce((s, v) => s + v, 0);
+    const last15 = trendData.values.slice(15, 30).reduce((s, v) => s + v, 0);
+    const momGrowth = first15 > 0 ? (last15 - first15) / first15 : 0;
     return {
       totalRoutes,
       totalTrips,
       totalPassengers,
-      yoyGrowth: 0.31,
+      momGrowth,
     };
-  }, [filteredRoutes]);
+  }, [filteredRoutes, trendData.values]);
+
+  const compareRoutes = useMemo<Route[]>(() => {
+    return compareRouteIds.map((id) => routeMap[id]).filter(Boolean) as Route[];
+  }, [compareRouteIds, routeMap]);
+
+  const compareStats = useMemo(() => {
+    const routesWithMom = compareRoutes.map((route) => ({
+      route,
+      momGrowth: calcMomGrowth(route.dailyTrips),
+    }));
+
+    const maxTrips = Math.max(...compareRoutes.map((r) => r.tripsLastMonth), 0);
+    const maxOccupancy = Math.max(...compareRoutes.map((r) => r.occupancy), 0);
+    const maxPassengers = Math.max(
+      ...compareRoutes.map((r) => r.totalPassengers),
+      0,
+    );
+    const maxMomGrowth = Math.max(...routesWithMom.map((r) => r.momGrowth), 0);
+    const trendMaxVal = Math.max(
+      ...compareRoutes.flatMap((r) => r.dailyTrips),
+      1,
+    );
+
+    const trips = routesWithMom.map(({ route }) => ({
+      routeId: route.id,
+      routeName: route.name,
+      color: route.color,
+      value: route.tripsLastMonth,
+      isMax: route.tripsLastMonth === maxTrips,
+    }));
+
+    const occupancy = routesWithMom.map(({ route }) => ({
+      routeId: route.id,
+      routeName: route.name,
+      color: route.color,
+      value: route.occupancy,
+      isMax: route.occupancy === maxOccupancy,
+    }));
+
+    const passengers = routesWithMom.map(({ route }) => ({
+      routeId: route.id,
+      routeName: route.name,
+      color: route.color,
+      value: route.totalPassengers,
+      isMax: route.totalPassengers === maxPassengers,
+    }));
+
+    const momGrowthList = routesWithMom.map(({ route, momGrowth }) => ({
+      routeId: route.id,
+      routeName: route.name,
+      color: route.color,
+      value: momGrowth,
+      isMax: momGrowth === maxMomGrowth,
+    }));
+
+    const trendByRoute = routesWithMom.map(({ route }) => ({
+      routeId: route.id,
+      routeName: route.name,
+      color: route.color,
+      dailyTrips: route.dailyTrips,
+    }));
+
+    return {
+      routes: routesWithMom,
+      trips,
+      occupancy,
+      passengers,
+      momGrowth: momGrowthList,
+      trendByRoute,
+      maxTrips,
+      maxOccupancy,
+      maxPassengers,
+      maxMomGrowth,
+      trendMaxVal,
+      count: compareRoutes.length,
+    };
+  }, [compareRoutes]);
 
   return {
     filteredRoutes,
@@ -147,6 +234,8 @@ export function useDerivedStats() {
     topOccupancy,
     trendData,
     totalKpis,
+    compareRoutes,
+    compareStats,
     stations,
     scenics,
   };

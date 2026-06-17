@@ -98,9 +98,10 @@ export function TopBar() {
           color="#22d3ee"
         />
         <KpiCard
-          label="同比增幅"
-          value={totalKpis.yoyGrowth * 100}
+          label="环比增幅"
+          value={Math.abs(totalKpis.momGrowth) * 100}
           suffix="%"
+          trend={totalKpis.momGrowth}
           color="#10b981"
         />
         <KpiCard
