@@ -6,19 +6,22 @@ import type { BarChartItem } from "@/components/charts/BarChart";
 import { formatNumber, formatPercent, typeName } from "@/utils/format";
 import { getTrainTypeColor } from "@/utils/color";
 import { cn } from "@/lib/utils";
-import type { Route } from "@/types";
 
 export default function ComparePanel() {
-  const compareRouteIds = useDataStore((s) => s.compareRouteIds);
   const comparePanelOpen = useDataStore((s) => s.comparePanelOpen);
   const toggleCompareRoute = useDataStore((s) => s.toggleCompareRoute);
   const clearCompareRoutes = useDataStore((s) => s.clearCompareRoutes);
   const setComparePanelOpen = useDataStore((s) => s.setComparePanelOpen);
-  const { routeMap } = useDerivedStats();
-
-  const compareRoutes = compareRouteIds
-    .map((id) => routeMap[id])
-    .filter(Boolean) as Route[];
+  const { compareStats, routeMap } = useDerivedStats();
+  const {
+    compareRoutes,
+    routeGrowth,
+    maxGrowth,
+    maxDailyTrips,
+    maxTrips,
+    maxOccupancy,
+    maxPassengers,
+  } = compareStats;
 
   if (compareRoutes.length === 0) return null;
 
@@ -42,26 +45,6 @@ export default function ComparePanel() {
     color: route.color,
     rank: idx + 1,
   }));
-
-  const maxTrips = Math.max(...compareRoutes.map((r) => r.tripsLastMonth));
-  const maxOccupancy = Math.max(...compareRoutes.map((r) => r.occupancy));
-  const maxPassengers = Math.max(
-    ...compareRoutes.map((r) => r.totalPassengers),
-  );
-  const maxDailyTrips = Math.max(
-    ...compareRoutes.flatMap((r) => r.dailyTrips),
-    1,
-  );
-
-  const routeGrowth = compareRoutes.map((route) => {
-    let firstHalf = 0;
-    let secondHalf = 0;
-    for (let i = 0; i < 15; i++) firstHalf += route.dailyTrips[i] ?? 0;
-    for (let i = 15; i < 30; i++) secondHalf += route.dailyTrips[i] ?? 0;
-    const growth = firstHalf > 0 ? (secondHalf - firstHalf) / firstHalf : 0;
-    return { routeId: route.id, growth, firstHalf, secondHalf };
-  });
-  const maxGrowth = Math.max(...routeGrowth.map((g) => Math.abs(g.growth)));
 
   return (
     <div
