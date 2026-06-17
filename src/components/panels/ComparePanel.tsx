@@ -10,66 +10,37 @@ import {
 import { useDataStore } from "@/store/useDataStore";
 import { useDerivedStats } from "@/hooks/useDerivedStats";
 import { BarChart } from "@/components/charts/BarChart";
-import type { BarChartItem } from "@/components/charts/BarChart";
-import {
-  formatNumber,
-  formatPercent,
-  typeName,
-  calcMomGrowth,
-} from "@/utils/format";
+import { formatNumber, formatPercent, typeName } from "@/utils/format";
 import { getTrainTypeColor } from "@/utils/color";
 import { cn } from "@/lib/utils";
-import type { Route } from "@/types";
+import type { RouteGrowth } from "@/types";
 
 export default function ComparePanel() {
-  const compareRouteIds = useDataStore((s) => s.compareRouteIds);
   const comparePanelOpen = useDataStore((s) => s.comparePanelOpen);
   const toggleCompareRoute = useDataStore((s) => s.toggleCompareRoute);
   const clearCompareRoutes = useDataStore((s) => s.clearCompareRoutes);
   const setComparePanelOpen = useDataStore((s) => s.setComparePanelOpen);
-  const { routeMap } = useDerivedStats();
+  const { compareStats } = useDerivedStats();
 
-  const compareRoutes = compareRouteIds
-    .map((id) => routeMap[id])
-    .filter(Boolean) as Route[];
+  const {
+    compareRoutes,
+    tripsData,
+    occupancyData,
+    passengerData,
+    routeGrowth,
+    maxTrips,
+    maxOccupancy,
+    maxPassengers,
+    maxGrowth,
+    minGrowth,
+    trendMax,
+  } = compareStats;
 
   if (compareRoutes.length === 0) return null;
 
-  const tripsData: BarChartItem[] = compareRoutes.map((route, idx) => ({
-    label: route.name,
-    value: route.tripsLastMonth,
-    color: route.color,
-    rank: idx + 1,
-  }));
-
-  const occupancyData: BarChartItem[] = compareRoutes.map((route, idx) => ({
-    label: route.name,
-    value: Math.round(route.occupancy * 1000) / 10,
-    color: route.color,
-    rank: idx + 1,
-  }));
-
-  const passengerData: BarChartItem[] = compareRoutes.map((route, idx) => ({
-    label: route.name,
-    value: route.totalPassengers,
-    color: route.color,
-    rank: idx + 1,
-  }));
-
-  const maxTrips = Math.max(...compareRoutes.map((r) => r.tripsLastMonth));
-  const maxOccupancy = Math.max(...compareRoutes.map((r) => r.occupancy));
-  const maxPassengers = Math.max(
-    ...compareRoutes.map((r) => r.totalPassengers),
-  );
-
-  const routeGrowth = compareRoutes.map((r) => ({
-    routeId: r.id,
-    growth: calcMomGrowth(r.dailyTrips),
-  }));
-  const maxGrowth = Math.max(...routeGrowth.map((g) => g.growth));
-  const minGrowth = Math.min(...routeGrowth.map((g) => g.growth));
-
-  const trendMax = Math.max(...compareRoutes.flatMap((r) => r.dailyTrips), 1);
+  function getGrowth(routeId: string): RouteGrowth | undefined {
+    return routeGrowth.find((g) => g.routeId === routeId);
+  }
 
   return (
     <div
@@ -308,8 +279,7 @@ export default function ComparePanel() {
             </div>
             <div className="mt-1 space-y-1.5">
               {compareRoutes.map((route) => {
-                const growth =
-                  routeGrowth.find((g) => g.routeId === route.id)?.growth ?? 0;
+                const growth = getGrowth(route.id)?.growth ?? 0;
                 const isMax = growth === maxGrowth;
                 return (
                   <div
