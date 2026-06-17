@@ -3,11 +3,20 @@ import { useDataStore } from "@/store/useDataStore";
 import { REGIONS, TRAIN_TYPE_LIST } from "@/data/constants";
 import { getLast30Days } from "@/utils/format";
 import { buildStationMap, getActiveStationIds } from "@/utils/coord";
-import type { Route, Station, Scenic, RegionId, TrainType } from "@/types";
+import type {
+  Route,
+  Station,
+  Scenic,
+  RegionId,
+  TrainType,
+  CompareStats,
+  RouteGrowth,
+} from "@/types";
 
 export function useDerivedStats() {
   const selectedRegion = useDataStore((s) => s.selectedRegion);
   const selectedRouteId = useDataStore((s) => s.selectedRouteId);
+  const compareRouteIds = useDataStore((s) => s.compareRouteIds);
   const routes = useDataStore((s) => s.routes);
   const stations = useDataStore((s) => s.stations);
   const scenics = useDataStore((s) => s.scenics);
@@ -125,13 +134,72 @@ export function useDerivedStats() {
       (sum, r) => sum + r.totalPassengers,
       0,
     );
+    let firstHalf = 0;
+    let secondHalf = 0;
+    filteredRoutes.forEach((route) => {
+      for (let i = 0; i < 15; i++) {
+        firstHalf += route.dailyTrips[i] ?? 0;
+      }
+      for (let i = 15; i < 30; i++) {
+        secondHalf += route.dailyTrips[i] ?? 0;
+      }
+    });
+    const momGrowth = firstHalf > 0 ? (secondHalf - firstHalf) / firstHalf : 0;
     return {
       totalRoutes,
       totalTrips,
       totalPassengers,
-      yoyGrowth: 0.31,
+      momGrowth,
     };
   }, [filteredRoutes]);
+
+  const compareStats = useMemo<CompareStats>(() => {
+    const compareRoutes = compareRouteIds
+      .map((id) => routeMap[id])
+      .filter(Boolean) as Route[];
+
+    if (compareRoutes.length === 0) {
+      return {
+        compareRoutes: [],
+        routeGrowth: [],
+        maxGrowth: 0,
+        maxDailyTrips: 0,
+        maxTrips: 0,
+        maxOccupancy: 0,
+        maxPassengers: 0,
+      };
+    }
+
+    const routeGrowth: RouteGrowth[] = compareRoutes.map((route) => {
+      let firstHalf = 0;
+      let secondHalf = 0;
+      for (let i = 0; i < 15; i++) firstHalf += route.dailyTrips[i] ?? 0;
+      for (let i = 15; i < 30; i++) secondHalf += route.dailyTrips[i] ?? 0;
+      const growth = firstHalf > 0 ? (secondHalf - firstHalf) / firstHalf : 0;
+      return { routeId: route.id, growth, firstHalf, secondHalf };
+    });
+
+    const maxGrowth = Math.max(...routeGrowth.map((g) => Math.abs(g.growth)));
+    const maxDailyTrips = Math.max(
+      ...compareRoutes.flatMap((r) => r.dailyTrips),
+      1,
+    );
+    const maxTrips = Math.max(...compareRoutes.map((r) => r.tripsLastMonth));
+    const maxOccupancy = Math.max(...compareRoutes.map((r) => r.occupancy));
+    const maxPassengers = Math.max(
+      ...compareRoutes.map((r) => r.totalPassengers),
+    );
+
+    return {
+      compareRoutes,
+      routeGrowth,
+      maxGrowth,
+      maxDailyTrips,
+      maxTrips,
+      maxOccupancy,
+      maxPassengers,
+    };
+  }, [compareRouteIds, routeMap]);
 
   return {
     filteredRoutes,
@@ -147,6 +215,7 @@ export function useDerivedStats() {
     topOccupancy,
     trendData,
     totalKpis,
+    compareStats,
     stations,
     scenics,
   };

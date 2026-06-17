@@ -6,19 +6,22 @@ import type { BarChartItem } from "@/components/charts/BarChart";
 import { formatNumber, formatPercent, typeName } from "@/utils/format";
 import { getTrainTypeColor } from "@/utils/color";
 import { cn } from "@/lib/utils";
-import type { Route } from "@/types";
 
 export default function ComparePanel() {
-  const compareRouteIds = useDataStore((s) => s.compareRouteIds);
   const comparePanelOpen = useDataStore((s) => s.comparePanelOpen);
   const toggleCompareRoute = useDataStore((s) => s.toggleCompareRoute);
   const clearCompareRoutes = useDataStore((s) => s.clearCompareRoutes);
   const setComparePanelOpen = useDataStore((s) => s.setComparePanelOpen);
-  const { routeMap } = useDerivedStats();
-
-  const compareRoutes = compareRouteIds
-    .map((id) => routeMap[id])
-    .filter(Boolean) as Route[];
+  const { compareStats, routeMap } = useDerivedStats();
+  const {
+    compareRoutes,
+    routeGrowth,
+    maxGrowth,
+    maxDailyTrips,
+    maxTrips,
+    maxOccupancy,
+    maxPassengers,
+  } = compareStats;
 
   if (compareRoutes.length === 0) return null;
 
@@ -42,12 +45,6 @@ export default function ComparePanel() {
     color: route.color,
     rank: idx + 1,
   }));
-
-  const maxTrips = Math.max(...compareRoutes.map((r) => r.tripsLastMonth));
-  const maxOccupancy = Math.max(...compareRoutes.map((r) => r.occupancy));
-  const maxPassengers = Math.max(
-    ...compareRoutes.map((r) => r.totalPassengers),
-  );
 
   return (
     <div
@@ -130,7 +127,7 @@ export default function ComparePanel() {
           ))}
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-4 gap-4">
           <div className="rounded-lg border border-slate-700/50 bg-slate-800/30 p-4">
             <div className="mb-3 flex items-center justify-between">
               <h4 className="text-sm font-semibold text-white">月开行趟次</h4>
@@ -276,15 +273,73 @@ export default function ComparePanel() {
               ))}
             </div>
           </div>
+
+          <div className="rounded-lg border border-slate-700/50 bg-slate-800/30 p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <h4 className="text-sm font-semibold text-white">环比增幅</h4>
+              <span className="font-orbitron text-[10px] text-slate-500">
+                MOM
+              </span>
+            </div>
+            <div className="space-y-3">
+              {routeGrowth.map((g) => {
+                const route = routeMap[g.routeId];
+                const barWidth =
+                  maxGrowth > 0
+                    ? Math.min((Math.abs(g.growth) / maxGrowth) * 45, 45)
+                    : 0;
+                const isPositive = g.growth >= 0;
+                return (
+                  <div key={g.routeId}>
+                    <div className="mb-1 flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="h-2 w-2 rounded-full"
+                          style={{ backgroundColor: route.color }}
+                        />
+                        <span className="text-slate-400">{route.name}</span>
+                      </div>
+                      <span
+                        className={cn(
+                          "font-orbitron font-bold",
+                          isPositive ? "text-emerald-400" : "text-rose-400",
+                        )}
+                      >
+                        {isPositive ? "+" : ""}
+                        {formatPercent(g.growth)}
+                      </span>
+                    </div>
+                    <div className="relative h-3 w-full rounded-full bg-slate-700/50">
+                      <div className="absolute left-1/2 top-0 h-full w-px bg-slate-600" />
+                      <div
+                        className={cn(
+                          "absolute top-0 h-full rounded-full",
+                          isPositive
+                            ? "left-1/2 bg-gradient-to-r from-emerald-500/60 to-emerald-400"
+                            : "right-1/2 bg-gradient-to-l from-rose-500/60 to-rose-400",
+                        )}
+                        style={{ width: `${barWidth}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
         <div className="mt-4 rounded-lg border border-slate-700/50 bg-slate-800/30 p-4">
-          <h4 className="mb-3 text-sm font-semibold text-white">
-            客流趋势对比 · 近30天
-          </h4>
-          <div className="h-40">
+          <div className="mb-3 flex items-center justify-between">
+            <h4 className="text-sm font-semibold text-white">
+              客流趋势对比 · 近30天
+            </h4>
+            <span className="font-orbitron text-[10px] text-slate-500">
+              DAILY TRIPS
+            </span>
+          </div>
+          <div className="h-48">
             <svg
-              viewBox="0 0 600 160"
+              viewBox="0 0 620 192"
               className="w-full h-full"
               preserveAspectRatio="none"
             >
@@ -313,26 +368,36 @@ export default function ComparePanel() {
               </defs>
 
               {[0, 0.25, 0.5, 0.75, 1].map((ratio) => (
-                <line
-                  key={ratio}
-                  x1="40"
-                  y1={10 + ratio * 130}
-                  x2="580"
-                  y2={10 + ratio * 130}
-                  stroke="#334155"
-                  strokeWidth="0.5"
-                  strokeDasharray="4 4"
-                />
+                <g key={ratio}>
+                  <line
+                    x1="56"
+                    y1={16 + ratio * 150}
+                    x2="600"
+                    y2={16 + ratio * 150}
+                    stroke="#334155"
+                    strokeWidth="0.5"
+                    strokeDasharray="4 4"
+                  />
+                  <text
+                    x="48"
+                    y={16 + ratio * 150 + 4}
+                    textAnchor="end"
+                    fill="#64748b"
+                    fontSize="10"
+                    fontFamily="Orbitron"
+                  >
+                    {Math.round(maxDailyTrips * (1 - ratio)).toLocaleString()}
+                  </text>
+                </g>
               ))}
 
               {compareRoutes.map((route) => {
-                const maxVal = Math.max(...route.dailyTrips);
                 const points = route.dailyTrips.map((val, i) => {
-                  const x = 40 + (i / 29) * 540;
-                  const y = 140 - (val / Math.max(maxVal, 1)) * 120;
+                  const x = 56 + (i / 29) * 540;
+                  const y = 166 - (val / maxDailyTrips) * 150;
                   return [x, y] as const;
                 });
-                const areaPath = `M${points.map(([x, y]) => `${x},${y}`).join(" L")} L580,150 L40,150 Z`;
+                const areaPath = `M${points.map(([x, y]) => `${x},${y}`).join(" L")} L600,176 L56,176 Z`;
                 const linePath = `M${points.map(([x, y]) => `${x},${y}`).join(" L")}`;
 
                 return (
@@ -356,21 +421,32 @@ export default function ComparePanel() {
               {compareRoutes.map((route, idx) => (
                 <g key={`legend-${route.id}`}>
                   <rect
-                    x={40 + idx * 120}
-                    y={5}
+                    x={56 + idx * 130}
+                    y={2}
                     width="8"
                     height="8"
                     fill={route.color}
                     rx="2"
                   />
                   <text
-                    x={52 + idx * 120}
-                    y={12}
+                    x={70 + idx * 130}
+                    y={9}
                     fontSize="10"
                     fill="#94a3b8"
                     dominantBaseline="middle"
                   >
                     {route.name}
+                  </text>
+                  <text
+                    x={70 + idx * 130}
+                    y={22}
+                    fontSize="9"
+                    fill={routeGrowth[idx]?.growth >= 0 ? "#34d399" : "#fb7185"}
+                    fontFamily="Orbitron"
+                    fontWeight="bold"
+                  >
+                    {routeGrowth[idx]?.growth >= 0 ? "↑" : "↓"}
+                    {formatPercent(Math.abs(routeGrowth[idx]?.growth || 0))}
                   </text>
                 </g>
               ))}
