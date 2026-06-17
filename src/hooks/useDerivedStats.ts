@@ -125,11 +125,22 @@ export function useDerivedStats() {
       (sum, r) => sum + r.totalPassengers,
       0,
     );
+    let firstHalf = 0;
+    let secondHalf = 0;
+    filteredRoutes.forEach((route) => {
+      for (let i = 0; i < 15; i++) {
+        firstHalf += route.dailyTrips[i] ?? 0;
+      }
+      for (let i = 15; i < 30; i++) {
+        secondHalf += route.dailyTrips[i] ?? 0;
+      }
+    });
+    const momGrowth = firstHalf > 0 ? (secondHalf - firstHalf) / firstHalf : 0;
     return {
       totalRoutes,
       totalTrips,
       totalPassengers,
-      yoyGrowth: 0.31,
+      momGrowth,
     };
   }, [filteredRoutes]);
 
