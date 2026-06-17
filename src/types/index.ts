@@ -1,14 +1,19 @@
 export type RegionId =
-  | 'huabei'
-  | 'huadong'
-  | 'huanan'
-  | 'huazhong'
-  | 'xinan'
-  | 'xibei'
-  | 'dongbei'
-  | 'national';
+  | "huabei"
+  | "huadong"
+  | "huanan"
+  | "huazhong"
+  | "xinan"
+  | "xibei"
+  | "dongbei"
+  | "national";
 
-export type TrainType = 'silver' | 'research' | 'sightseeing' | 'red' | 'family';
+export type TrainType =
+  | "silver"
+  | "research"
+  | "sightseeing"
+  | "red"
+  | "family";
 
 export interface Region {
   id: RegionId;
@@ -20,7 +25,7 @@ export interface Region {
 export interface Scenic {
   id: string;
   name: string;
-  level: '5A' | '4A';
+  level: "5A" | "4A";
   coord: [number, number];
   regionId: RegionId;
 }
@@ -50,4 +55,30 @@ export interface StationPopupData {
   stationId: string;
   x: number;
   y: number;
+}
+
+export interface RouteGrowth {
+  routeId: string;
+  growth: number;
+}
+
+export interface CompareBarItem {
+  label: string;
+  value: number;
+  color: string;
+  rank: number;
+}
+
+export interface CompareStats {
+  compareRoutes: Route[];
+  tripsData: CompareBarItem[];
+  occupancyData: CompareBarItem[];
+  passengerData: CompareBarItem[];
+  routeGrowth: RouteGrowth[];
+  maxTrips: number;
+  maxOccupancy: number;
+  maxPassengers: number;
+  maxGrowth: number;
+  minGrowth: number;
+  trendMax: number;
 }

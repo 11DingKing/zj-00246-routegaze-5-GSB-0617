@@ -1,13 +1,21 @@
 import { useMemo } from "react";
 import { useDataStore } from "@/store/useDataStore";
 import { REGIONS, TRAIN_TYPE_LIST } from "@/data/constants";
-import { getLast30Days } from "@/utils/format";
+import { getLast30Days, calcMomGrowth } from "@/utils/format";
 import { buildStationMap, getActiveStationIds } from "@/utils/coord";
-import type { Route, Station, Scenic, RegionId, TrainType } from "@/types";
+import type {
+  Route,
+  Station,
+  Scenic,
+  RegionId,
+  TrainType,
+  CompareStats,
+} from "@/types";
 
 export function useDerivedStats() {
   const selectedRegion = useDataStore((s) => s.selectedRegion);
   const selectedRouteId = useDataStore((s) => s.selectedRouteId);
+  const compareRouteIds = useDataStore((s) => s.compareRouteIds);
   const routes = useDataStore((s) => s.routes);
   const stations = useDataStore((s) => s.stations);
   const scenics = useDataStore((s) => s.scenics);
@@ -125,13 +133,71 @@ export function useDerivedStats() {
       (sum, r) => sum + r.totalPassengers,
       0,
     );
+    const momGrowth = calcMomGrowth(trendData.values);
     return {
       totalRoutes,
       totalTrips,
       totalPassengers,
-      yoyGrowth: 0.31,
+      momGrowth,
     };
-  }, [filteredRoutes]);
+  }, [filteredRoutes, trendData.values]);
+
+  const compareStats = useMemo<CompareStats>(() => {
+    const compareRoutes = compareRouteIds
+      .map((id) => routeMap[id])
+      .filter((r): r is Route => Boolean(r));
+
+    const tripsData = compareRoutes.map((route, idx) => ({
+      label: route.name,
+      value: route.tripsLastMonth,
+      color: route.color,
+      rank: idx + 1,
+    }));
+
+    const occupancyData = compareRoutes.map((route, idx) => ({
+      label: route.name,
+      value: Math.round(route.occupancy * 1000) / 10,
+      color: route.color,
+      rank: idx + 1,
+    }));
+
+    const passengerData = compareRoutes.map((route, idx) => ({
+      label: route.name,
+      value: route.totalPassengers,
+      color: route.color,
+      rank: idx + 1,
+    }));
+
+    const maxTrips = Math.max(...compareRoutes.map((r) => r.tripsLastMonth), 0);
+    const maxOccupancy = Math.max(...compareRoutes.map((r) => r.occupancy), 0);
+    const maxPassengers = Math.max(
+      ...compareRoutes.map((r) => r.totalPassengers),
+      0,
+    );
+
+    const routeGrowth = compareRoutes.map((r) => ({
+      routeId: r.id,
+      growth: calcMomGrowth(r.dailyTrips),
+    }));
+    const maxGrowth = Math.max(...routeGrowth.map((g) => g.growth), 0);
+    const minGrowth = Math.min(...routeGrowth.map((g) => g.growth), 0);
+
+    const trendMax = Math.max(...compareRoutes.flatMap((r) => r.dailyTrips), 1);
+
+    return {
+      compareRoutes,
+      tripsData,
+      occupancyData,
+      passengerData,
+      routeGrowth,
+      maxTrips,
+      maxOccupancy,
+      maxPassengers,
+      maxGrowth,
+      minGrowth,
+      trendMax,
+    };
+  }, [compareRouteIds, routeMap]);
 
   return {
     filteredRoutes,
@@ -147,6 +213,7 @@ export function useDerivedStats() {
     topOccupancy,
     trendData,
     totalKpis,
+    compareStats,
     stations,
     scenics,
   };
