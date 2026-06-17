@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useDataStore } from "@/store/useDataStore";
 import { REGIONS, TRAIN_TYPE_LIST } from "@/data/constants";
-import { getLast30Days } from "@/utils/format";
+import { getLast30Days, calcMomGrowth } from "@/utils/format";
 import { buildStationMap, getActiveStationIds } from "@/utils/coord";
 import type { Route, Station, Scenic, RegionId, TrainType } from "@/types";
 
@@ -125,13 +125,14 @@ export function useDerivedStats() {
       (sum, r) => sum + r.totalPassengers,
       0,
     );
+    const momGrowth = calcMomGrowth(trendData.values);
     return {
       totalRoutes,
       totalTrips,
       totalPassengers,
-      yoyGrowth: 0.31,
+      momGrowth,
     };
-  }, [filteredRoutes]);
+  }, [filteredRoutes, trendData.values]);
 
   return {
     filteredRoutes,

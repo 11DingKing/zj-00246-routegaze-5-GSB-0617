@@ -1,9 +1,22 @@
-import { X, Trash2, GitCompare, Minus, Plus } from "lucide-react";
+import {
+  X,
+  Trash2,
+  GitCompare,
+  Minus,
+  Plus,
+  TrendingUp,
+  TrendingDown,
+} from "lucide-react";
 import { useDataStore } from "@/store/useDataStore";
 import { useDerivedStats } from "@/hooks/useDerivedStats";
 import { BarChart } from "@/components/charts/BarChart";
 import type { BarChartItem } from "@/components/charts/BarChart";
-import { formatNumber, formatPercent, typeName } from "@/utils/format";
+import {
+  formatNumber,
+  formatPercent,
+  typeName,
+  calcMomGrowth,
+} from "@/utils/format";
 import { getTrainTypeColor } from "@/utils/color";
 import { cn } from "@/lib/utils";
 import type { Route } from "@/types";
@@ -48,6 +61,15 @@ export default function ComparePanel() {
   const maxPassengers = Math.max(
     ...compareRoutes.map((r) => r.totalPassengers),
   );
+
+  const routeGrowth = compareRoutes.map((r) => ({
+    routeId: r.id,
+    growth: calcMomGrowth(r.dailyTrips),
+  }));
+  const maxGrowth = Math.max(...routeGrowth.map((g) => g.growth));
+  const minGrowth = Math.min(...routeGrowth.map((g) => g.growth));
+
+  const trendMax = Math.max(...compareRoutes.flatMap((r) => r.dailyTrips), 1);
 
   return (
     <div
@@ -130,7 +152,7 @@ export default function ComparePanel() {
           ))}
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-4 gap-4">
           <div className="rounded-lg border border-slate-700/50 bg-slate-800/30 p-4">
             <div className="mb-3 flex items-center justify-between">
               <h4 className="text-sm font-semibold text-white">月开行趟次</h4>
@@ -276,6 +298,75 @@ export default function ComparePanel() {
               ))}
             </div>
           </div>
+
+          <div className="rounded-lg border border-slate-700/50 bg-slate-800/30 p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <h4 className="text-sm font-semibold text-white">环比增长</h4>
+              <span className="font-orbitron text-[10px] text-slate-500">
+                MOM
+              </span>
+            </div>
+            <div className="mt-1 space-y-1.5">
+              {compareRoutes.map((route) => {
+                const growth =
+                  routeGrowth.find((g) => g.routeId === route.id)?.growth ?? 0;
+                const isMax = growth === maxGrowth;
+                return (
+                  <div
+                    key={route.id}
+                    className="flex items-center justify-between text-xs"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="h-2 w-2 rounded-full"
+                        style={{ backgroundColor: route.color }}
+                      />
+                      <span className="text-slate-400">{route.name}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      {growth >= 0 ? (
+                        <TrendingUp className="h-3 w-3 text-emerald-400" />
+                      ) : (
+                        <TrendingDown className="h-3 w-3 text-rose-400" />
+                      )}
+                      <span
+                        className={cn(
+                          "font-orbitron font-bold",
+                          isMax
+                            ? growth >= 0
+                              ? "text-emerald-400"
+                              : "text-rose-400"
+                            : growth >= 0
+                              ? "text-emerald-300"
+                              : "text-rose-300",
+                        )}
+                      >
+                        {growth >= 0 ? "+" : ""}
+                        {formatPercent(growth)}
+                      </span>
+                      {isMax && growth > 0 && (
+                        <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] text-emerald-400">
+                          最高
+                        </span>
+                      )}
+                      {growth === minGrowth && growth < 0 && (
+                        <span className="rounded bg-rose-500/20 px-1.5 py-0.5 text-[10px] text-rose-400">
+                          最低
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-3 pt-3 border-t border-slate-700/50">
+              <p className="text-[10px] text-slate-500 leading-relaxed">
+                基于近30天前15天与后15天
+                <br />
+                总开行趟次对比计算
+              </p>
+            </div>
+          </div>
         </div>
 
         <div className="mt-4 rounded-lg border border-slate-700/50 bg-slate-800/30 p-4">
@@ -326,10 +417,9 @@ export default function ComparePanel() {
               ))}
 
               {compareRoutes.map((route) => {
-                const maxVal = Math.max(...route.dailyTrips);
                 const points = route.dailyTrips.map((val, i) => {
                   const x = 40 + (i / 29) * 540;
-                  const y = 140 - (val / Math.max(maxVal, 1)) * 120;
+                  const y = 140 - (val / trendMax) * 120;
                   return [x, y] as const;
                 });
                 const areaPath = `M${points.map(([x, y]) => `${x},${y}`).join(" L")} L580,150 L40,150 Z`;
