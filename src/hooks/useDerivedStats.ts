@@ -3,19 +3,14 @@ import { useDataStore } from "@/store/useDataStore";
 import { REGIONS, TRAIN_TYPE_LIST } from "@/data/constants";
 import { getLast30Days } from "@/utils/format";
 import { buildStationMap, getActiveStationIds } from "@/utils/coord";
-import type { Route, Station, Scenic, RegionId, TrainType } from "@/types";
-
-export interface CompareRouteStats {
-  id: string;
-  name: string;
-  color: string;
-  type: Route["type"];
-  tripsLastMonth: number;
-  occupancy: number;
-  totalPassengers: number;
-  momGrowth: number;
-  dailyTrips: number[];
-}
+import type {
+  Route,
+  Station,
+  Scenic,
+  RegionId,
+  TrainType,
+  CompareRouteStats,
+} from "@/types";
 
 export function useDerivedStats() {
   const selectedRegion = useDataStore((s) => s.selectedRegion);

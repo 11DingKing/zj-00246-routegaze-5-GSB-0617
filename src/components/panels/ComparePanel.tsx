@@ -9,7 +9,6 @@ import {
 } from "lucide-react";
 import { useDataStore } from "@/store/useDataStore";
 import { useDerivedStats } from "@/hooks/useDerivedStats";
-import type { CompareRouteStats } from "@/hooks/useDerivedStats";
 import { BarChart } from "@/components/charts/BarChart";
 import type { BarChartItem } from "@/components/charts/BarChart";
 import { formatNumber, formatPercent, typeName } from "@/utils/format";
@@ -17,7 +16,6 @@ import { getTrainTypeColor } from "@/utils/color";
 import { cn } from "@/lib/utils";
 
 export default function ComparePanel() {
-  const compareRouteIds = useDataStore((s) => s.compareRouteIds);
   const comparePanelOpen = useDataStore((s) => s.comparePanelOpen);
   const toggleCompareRoute = useDataStore((s) => s.toggleCompareRoute);
   const clearCompareRoutes = useDataStore((s) => s.clearCompareRoutes);
